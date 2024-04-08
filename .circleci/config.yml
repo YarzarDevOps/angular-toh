@@ -3,6 +3,7 @@ version: 2.1
 jobs:
   build-prod:
     docker:
+      # node image including browser
       - image: cimg/node:18.20.0-browsers
     steps:
       - checkout
@@ -11,7 +12,7 @@ jobs:
             - npm-cache-{{ checksum "package-lock.json" }}
       - run:
           name: Install Dependencies
-          command: npm Install
+          command: npm nstall
       - save_cache:
           paths:
             - ~/.npm
@@ -22,7 +23,6 @@ jobs:
       - run:
           name: Install ChromeHeadless
           command: |
-            sudo apt-get update
             sudo apt-get update
             sudo apt-get install -y libappindicator1 fonts-liberation libu2f-udev libvulkan1
             wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -46,8 +46,17 @@ jobs:
             sudo ./aws/install
       - run:
           name: Deploy to S3
+          # `find dist -maxdepth 1 -type d` only look for directories directly under the `dist` directory, not recursively into subdirectories.
+          # `|` This is a pipe operator that redirects the output of the find command to the input of the awk command.
+          # `awk 'NR==2'` uses awk to filter the output of find. awk is a versatile text processing tool. `NR==2` tells awk to only print the second line of input it receives.
+          # echo $(find dist -maxdepth 1 -type d)
+          # dist dist/toh
+          # echo $(find dist -maxdepth 1 -type d | awk 'NR==1')
+          # dist
+          # echo $(find dist -maxdepth 1 -type d | awk 'NR==2')
+          # dist/toh
           command: |
-            DIST_OUTPUT_DIR==$(find dist -maxdepth 1 -type d | awk 'NR==2')
+            DIST_OUTPUT_DIR=$(find dist -maxdepth 1 -type d | awk 'NR==2')
             aws s3 sync ${DIST_OUTPUT_DIR}/browser/ s3://$S3_BUCKET_NAME --delete
 
 workflows:
@@ -63,4 +72,11 @@ workflows:
               only:
                 - main
                 - master
+      # - build-dev:
+      #     requires:
+      #       - test
+      #     filters:
+      #       branches:
+      #         only:
+      #           - develop
 
